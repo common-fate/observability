@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/encoding/gzip"
 )
 
-func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
-	metricExporter, err := newMetricsExporter(c.Endpoint, c.Insecure, c.Headers)
+func NewMetricsPipeline(ctx context.Context, c PipelineConfig) (func(context.Context) error, error) {
+	metricExporter, err := newMetricsExporter(ctx, c.Endpoint, c.Insecure, c.Headers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metric exporter: %v", err)
 	}
@@ -44,7 +44,7 @@ func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
 		controller.WithCollectPeriod(period),
 	)
 
-	if err = pusher.Start(context.Background()); err != nil {
+	if err = pusher.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start controller: %v", err)
 	}
 
@@ -59,19 +59,19 @@ func NewMetricsPipeline(c PipelineConfig) (func() error, error) {
 	}
 
 	metricglobal.SetMeterProvider(provider)
-	return func() error {
-		_ = pusher.Stop(context.Background())
-		return metricExporter.Shutdown(context.Background())
+	return func(ctx context.Context) error {
+		_ = pusher.Stop(ctx)
+		return metricExporter.Shutdown(ctx)
 	}, nil
 }
 
-func newMetricsExporter(endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
+func newMetricsExporter(ctx context.Context, endpoint string, insecure bool, headers map[string]string) (*otlpmetric.Exporter, error) {
 	secureOption := otlpmetricgrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
 	if insecure {
 		secureOption = otlpmetricgrpc.WithInsecure()
 	}
 	return otlpmetric.New(
-		context.Background(),
+		ctx,
 		otlpmetricgrpc.NewClient(
 			secureOption,
 			otlpmetricgrpc.WithEndpoint(endpoint),

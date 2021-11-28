@@ -15,8 +15,8 @@ import (
 	"google.golang.org/grpc/encoding/gzip"
 )
 
-func NewTracePipeline(c PipelineConfig) (func() error, error) {
-	spanExporter, err := newTraceExporter(c.Endpoint, c.Insecure, c.Headers)
+func NewTracePipeline(ctx context.Context, c PipelineConfig) (func(context.Context) error, error) {
+	spanExporter, err := newTraceExporter(ctx, c.Endpoint, c.Insecure, c.Headers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create span exporter: %v", err)
 	}
@@ -34,19 +34,19 @@ func NewTracePipeline(c PipelineConfig) (func() error, error) {
 
 	otel.SetTracerProvider(tp)
 
-	return func() error {
-		_ = bsp.Shutdown(context.Background())
-		return spanExporter.Shutdown(context.Background())
+	return func(ctx context.Context) error {
+		_ = bsp.Shutdown(ctx)
+		return spanExporter.Shutdown(ctx)
 	}, nil
 }
 
-func newTraceExporter(endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
+func newTraceExporter(ctx context.Context, endpoint string, insecure bool, headers map[string]string) (*otlptrace.Exporter, error) {
 	secureOption := otlptracegrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, ""))
 	if insecure {
 		secureOption = otlptracegrpc.WithInsecure()
 	}
 	return otlptrace.New(
-		context.Background(),
+		ctx,
 		otlptracegrpc.NewClient(
 			secureOption,
 			otlptracegrpc.WithEndpoint(endpoint),

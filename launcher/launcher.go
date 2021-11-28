@@ -39,6 +39,7 @@ type Config struct {
 	Resource                       *resource.Resource
 	logger                         zap.Logger
 	errorHandler                   otel.ErrorHandler
+	context                        context.Context
 }
 
 func validateConfiguration(c Config) error {
@@ -160,6 +161,14 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
+// WithContext configures whether a custom context should be used
+// to initiate tracing. If not, context.Background() is used.
+func WithContext(ctx context.Context) Option {
+	return func(c *Config) {
+		c.context = ctx
+	}
+}
+
 type defaultHandler struct {
 	logger zap.Logger
 }
@@ -172,6 +181,7 @@ func newConfig(opts ...Option) Config {
 	var c Config
 	envError := envconfig.Process(context.Background(), &c)
 	c.logger = *zap.L()
+	c.context = context.Background()
 	c.errorHandler = &defaultHandler{logger: c.logger}
 	var defaultOpts []Option
 
@@ -189,7 +199,7 @@ func newConfig(opts ...Option) Config {
 
 type Launcher struct {
 	config        Config
-	shutdownFuncs []func() error
+	shutdownFuncs []func(context.Context) error
 }
 
 func newResource(c *Config) *resource.Resource {
@@ -238,7 +248,7 @@ func newResource(c *Config) *resource.Resource {
 
 	// These detectors can't actually fail, ignoring the error.
 	r, _ = resource.New(
-		context.Background(),
+		c.context,
 		resource.WithSchemaURL(semconv.SchemaURL),
 		resource.WithAttributes(attributes...),
 	)
@@ -249,12 +259,12 @@ func newResource(c *Config) *resource.Resource {
 	return r
 }
 
-func setupTracing(c Config) (func() error, error) {
+func setupTracing(c Config) (func(ctx context.Context) error, error) {
 	if c.SpanExporterEndpoint == "" {
 		c.logger.Debug("tracing is disabled by configuration: no endpoint set")
 		return nil, nil
 	}
-	return pipelines.NewTracePipeline(pipelines.PipelineConfig{
+	return pipelines.NewTracePipeline(c.context, pipelines.PipelineConfig{
 		Endpoint:    c.SpanExporterEndpoint,
 		Insecure:    c.SpanExporterEndpointInsecure,
 		Headers:     c.Headers,
@@ -263,14 +273,14 @@ func setupTracing(c Config) (func() error, error) {
 	})
 }
 
-type setupFunc func(Config) (func() error, error)
+type setupFunc func(Config) (func(ctx context.Context) error, error)
 
-func setupMetrics(c Config) (func() error, error) {
+func setupMetrics(c Config) (func(context.Context) error, error) {
 	if !c.MetricsEnabled {
 		c.logger.Debug("metrics are disabled by configuration: no endpoint set")
 		return nil, nil
 	}
-	return pipelines.NewMetricsPipeline(pipelines.PipelineConfig{
+	return pipelines.NewMetricsPipeline(c.context, pipelines.PipelineConfig{
 		Endpoint:        c.MetricExporterEndpoint,
 		Insecure:        c.MetricExporterEndpointInsecure,
 		Headers:         c.Headers,
@@ -317,8 +327,12 @@ func ConfigureOpentelemetry(opts ...Option) Launcher {
 }
 
 func (ls Launcher) Shutdown() {
+	ls.ShutdownContext(context.Background())
+}
+
+func (ls Launcher) ShutdownContext(ctx context.Context) {
 	for _, shutdown := range ls.shutdownFuncs {
-		if err := shutdown(); err != nil {
+		if err := shutdown(ctx); err != nil {
 			ls.config.logger.Sugar().Fatalf("failed to stop exporter: %v", err)
 		}
 	}
