@@ -35,7 +35,7 @@ func NewMetricsPipeline(ctx context.Context, c PipelineConfig) (func(context.Con
 		}
 	}
 	pusher := controller.New(
-		processor.New(
+		processor.NewFactory(
 			selector.NewWithInexpensiveDistribution(),
 			metricExporter,
 		),
@@ -48,17 +48,15 @@ func NewMetricsPipeline(ctx context.Context, c PipelineConfig) (func(context.Con
 		return nil, fmt.Errorf("failed to start controller: %v", err)
 	}
 
-	provider := pusher.MeterProvider()
-
-	if err = runtimeMetrics.Start(runtimeMetrics.WithMeterProvider(provider)); err != nil {
+	if err = runtimeMetrics.Start(runtimeMetrics.WithMeterProvider(pusher)); err != nil {
 		return nil, fmt.Errorf("failed to start runtime metrics: %v", err)
 	}
 
-	if err = hostMetrics.Start(hostMetrics.WithMeterProvider(provider)); err != nil {
+	if err = hostMetrics.Start(hostMetrics.WithMeterProvider(pusher)); err != nil {
 		return nil, fmt.Errorf("failed to start host metrics: %v", err)
 	}
 
-	metricglobal.SetMeterProvider(provider)
+	metricglobal.SetMeterProvider(pusher)
 	return func(ctx context.Context) error {
 		_ = pusher.Stop(ctx)
 		return metricExporter.Shutdown(ctx)
