@@ -35,6 +35,7 @@ type Config struct {
 	LogLevel                       string            `env:"OTEL_LOG_LEVEL,default=info"`
 	Propagators                    []string          `env:"OTEL_PROPAGATORS,default=b3"`
 	MetricReportingPeriod          string            `env:"OTEL_EXPORTER_OTLP_METRIC_PERIOD,default=30s"`
+	BatchTimeout                   time.Duration
 	resourceAttributes             map[string]string
 	Resource                       *resource.Resource
 	logger                         zap.Logger
@@ -161,6 +162,14 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
+// WithBatchTimeout sets the batch timeout for sending traces to the collector
+// https://pkg.go.dev/go.opentelemetry.io/otel/sdk@v0.13.0/trace#BatchSpanProcessorOptions
+func WithBatchTimeout(timeout time.Duration) Option {
+	return func(c *Config) {
+		c.BatchTimeout = timeout
+	}
+}
+
 // WithContext configures whether a custom context should be used
 // to initiate tracing. If not, context.Background() is used.
 func WithContext(ctx context.Context) Option {
@@ -180,6 +189,7 @@ func (l *defaultHandler) Handle(err error) {
 func newConfig(opts ...Option) Config {
 	var c Config
 	envError := envconfig.Process(context.Background(), &c)
+	c.BatchTimeout = 5 * time.Second
 	c.logger = *zap.L()
 	c.context = context.Background()
 	c.errorHandler = &defaultHandler{logger: c.logger}
@@ -265,11 +275,12 @@ func setupTracing(c Config) (func(ctx context.Context) error, error) {
 		return nil, nil
 	}
 	return pipelines.NewTracePipeline(c.context, pipelines.PipelineConfig{
-		Endpoint:    c.SpanExporterEndpoint,
-		Insecure:    c.SpanExporterEndpointInsecure,
-		Headers:     c.Headers,
-		Resource:    c.Resource,
-		Propagators: c.Propagators,
+		Endpoint:     c.SpanExporterEndpoint,
+		Insecure:     c.SpanExporterEndpointInsecure,
+		Headers:      c.Headers,
+		Resource:     c.Resource,
+		Propagators:  c.Propagators,
+		BatchTimeout: c.BatchTimeout,
 	})
 }
 
@@ -286,6 +297,7 @@ func setupMetrics(c Config) (func(context.Context) error, error) {
 		Headers:         c.Headers,
 		Resource:        c.Resource,
 		ReportingPeriod: c.MetricReportingPeriod,
+		BatchTimeout:    c.BatchTimeout,
 	})
 }
 

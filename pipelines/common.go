@@ -1,6 +1,10 @@
 package pipelines
 
-import "go.opentelemetry.io/otel/sdk/resource"
+import (
+	"time"
+
+	"go.opentelemetry.io/otel/sdk/resource"
+)
 
 type PipelineConfig struct {
 	Endpoint        string
@@ -8,6 +12,7 @@ type PipelineConfig struct {
 	Headers         map[string]string
 	Resource        *resource.Resource
 	ReportingPeriod string
+	BatchTimeout    time.Duration
 	Propagators     []string
 }
 

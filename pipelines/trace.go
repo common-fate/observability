@@ -21,7 +21,7 @@ func NewTracePipeline(ctx context.Context, c PipelineConfig) (func(context.Conte
 		return nil, fmt.Errorf("failed to create span exporter: %v", err)
 	}
 
-	bsp := trace.NewBatchSpanProcessor(spanExporter)
+	bsp := trace.NewBatchSpanProcessor(spanExporter, trace.WithBatchTimeout(c.BatchTimeout))
 	tp := trace.NewTracerProvider(
 		trace.WithSampler(trace.AlwaysSample()),
 		trace.WithSpanProcessor(bsp),
