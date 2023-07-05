@@ -9,11 +9,10 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/sethvargo/go-envconfig v0.4.0
 	github.com/shirou/gopsutil v3.21.10+incompatible // indirect
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.1
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	go.opentelemetry.io/collector/model v0.40.0
 	go.opentelemetry.io/contrib v0.23.0
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.28.0
 	go.opentelemetry.io/contrib/instrumentation/host v0.23.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.23.0
 	go.opentelemetry.io/contrib/propagators/b3 v1.3.0
@@ -27,6 +26,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.3.0
 	go.opentelemetry.io/otel/sdk/metric v0.26.0
 	go.opentelemetry.io/otel/trace v1.3.0
+	go.uber.org/goleak v1.1.11-0.20210813005559-691160354723
 	go.uber.org/zap v1.19.1
-	google.golang.org/grpc v1.42.0
+	google.golang.org/grpc v1.53.0
 )
